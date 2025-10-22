@@ -7,7 +7,7 @@ pandas==2.2.3
 python-telegram-bot==21.6
 pytz==2024.2
 requests==2.32.3
-TA-Lib==0.4.32
+TA-Lib==0.4.28
 async-timeout==4.0.3
 attrs==25.4.0
 certifi==2025.10.5
