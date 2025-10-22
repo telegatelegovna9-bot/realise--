@@ -1,24 +1,24 @@
 import asyncio
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 import pandas as pd
-from monitor.fetcher import get_all_futures_tickers, fetch_ohlcv  # Изменён импорт
+from monitor.fetcher import get_all_futures_tickers, fetch_ohlcv
 from monitor.analyzer import analyze
 from monitor.signals import send_signal
 from monitor.logger import log
 from monitor.settings import load_config
 
 scheduler = AsyncIOScheduler()
-semaphore = asyncio.Semaphore(10)  # Уменьшено с 50 до 10 для избежания HTTP 429
+semaphore = asyncio.Semaphore(10)  # Ограничение на 10 одновременных запросов
 
 async def process_symbol(symbol, config):
     async with semaphore:
         await asyncio.sleep(0.1)  # Задержка 100 мс между запросами
         try:
-            df = await fetch_ohlcv(symbol, config['timeframe'])  # Изменено на fetch_ohlcv
+            df = await fetch_ohlcv(symbol, config['timeframe'])
             if df.empty:
                 log(f"{symbol} - пустой DataFrame после fetch_ohlcv", level="warning")
                 return
-            is_signal, info = analyze(df, config, symbol=symbol)  # Передаём symbol явно
+            is_signal, info = analyze(df, config, symbol=symbol)
             if is_signal:
                 log(f"Начало отправки сигнала для {symbol}", level="info")
                 await send_signal(symbol, config['timeframe'], info)
@@ -49,10 +49,21 @@ async def run_monitor():
         log(f"Ошибка в run_monitor: {str(e)}", level="error")
 
 def start_monitor():
+    # Запускаем планировщик
     scheduler.add_job(run_monitor, 'interval', seconds=60)
     scheduler.start()
     log("Мониторинг запущен", level="info")
 
-if __name__ == "__main__":
+async def main():
+    # Запускаем планировщик и бота
     start_monitor()
-    asyncio.get_event_loop().run_forever()
+    try:
+        # Держим цикл событий активным
+        await asyncio.Event().wait()
+    except KeyboardInterrupt:
+        log("Остановка мониторинга", level="info")
+        scheduler.shutdown()
+
+if __name__ == "__main__":
+    # Запускаем асинхронный цикл
+    asyncio.run(main())
